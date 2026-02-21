@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
@@ -38,11 +39,22 @@ from .const import (
     DOMAIN,
 )
 
+def _int_box(min_val: int, max_val: int) -> selector.NumberSelector:
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=min_val,
+            max=max_val,
+            step=1,
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+
+
 _STEP_1_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CHARGER_HOST): str,
-        vol.Optional(CONF_CHARGER_PORT, default=DEFAULT_PORT): vol.All(int, vol.Range(min=1, max=65535)),
-        vol.Optional(CONF_CHARGER_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(int, vol.Range(min=1, max=255)),
+        vol.Optional(CONF_CHARGER_PORT, default=DEFAULT_PORT): _int_box(1, 65535),
+        vol.Optional(CONF_CHARGER_SLAVE_ID, default=DEFAULT_SLAVE_ID): _int_box(1, 255),
         vol.Required(CONF_SOLAR_EXPORT_SENSOR): selector.EntitySelector(
             selector.EntitySelectorConfig(device_class="power")
         ),
@@ -51,17 +63,17 @@ _STEP_1_SCHEMA = vol.Schema(
 
 _STEP_2_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_MIN_CURRENT, default=DEFAULT_MIN_CURRENT): vol.All(int, vol.Range(min=6, max=16)),
-        vol.Optional(CONF_MAX_CURRENT, default=DEFAULT_MAX_CURRENT): vol.All(int, vol.Range(min=6, max=16)),
-        vol.Optional(CONF_VOLTAGE, default=DEFAULT_VOLTAGE): vol.All(int, vol.Range(min=100, max=400)),
-        vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): vol.All(int, vol.Range(min=10, max=300)),
-        vol.Optional(CONF_MIN_POWER_1PHASE, default=DEFAULT_MIN_POWER_1PHASE): vol.All(int, vol.Range(min=500, max=5000)),
-        vol.Optional(CONF_MIN_POWER_3PHASE, default=DEFAULT_MIN_POWER_3PHASE): vol.All(int, vol.Range(min=1000, max=15000)),
-        vol.Optional(CONF_HYSTERESIS_W, default=DEFAULT_HYSTERESIS_W): vol.All(int, vol.Range(min=0, max=1000)),
-        vol.Optional(CONF_PHASE_SWITCH_PAUSE, default=DEFAULT_PHASE_SWITCH_PAUSE): vol.All(int, vol.Range(min=30, max=600)),
-        vol.Optional(CONF_PHASE_SWITCH_REGISTER, default=DEFAULT_PHASE_SWITCH_REGISTER): vol.All(int, vol.Range(min=0, max=65535)),
-        vol.Optional(CONF_PHASE_1_VALUE, default=DEFAULT_PHASE_1_VALUE): vol.All(int, vol.Range(min=0, max=65535)),
-        vol.Optional(CONF_PHASE_3_VALUE, default=DEFAULT_PHASE_3_VALUE): vol.All(int, vol.Range(min=0, max=65535)),
+        vol.Optional(CONF_MIN_CURRENT, default=DEFAULT_MIN_CURRENT): _int_box(6, 16),
+        vol.Optional(CONF_MAX_CURRENT, default=DEFAULT_MAX_CURRENT): _int_box(6, 16),
+        vol.Optional(CONF_VOLTAGE, default=DEFAULT_VOLTAGE): _int_box(100, 400),
+        vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): _int_box(10, 300),
+        vol.Optional(CONF_MIN_POWER_1PHASE, default=DEFAULT_MIN_POWER_1PHASE): _int_box(500, 5000),
+        vol.Optional(CONF_MIN_POWER_3PHASE, default=DEFAULT_MIN_POWER_3PHASE): _int_box(1000, 15000),
+        vol.Optional(CONF_HYSTERESIS_W, default=DEFAULT_HYSTERESIS_W): _int_box(0, 1000),
+        vol.Optional(CONF_PHASE_SWITCH_PAUSE, default=DEFAULT_PHASE_SWITCH_PAUSE): _int_box(30, 600),
+        vol.Optional(CONF_PHASE_SWITCH_REGISTER, default=DEFAULT_PHASE_SWITCH_REGISTER): _int_box(0, 65535),
+        vol.Optional(CONF_PHASE_1_VALUE, default=DEFAULT_PHASE_1_VALUE): _int_box(0, 65535),
+        vol.Optional(CONF_PHASE_3_VALUE, default=DEFAULT_PHASE_3_VALUE): _int_box(0, 65535),
     }
 )
 
@@ -73,6 +85,11 @@ class SolarChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+        return SolarChargerOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict | None = None
@@ -106,3 +123,67 @@ class SolarChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="charging_params",
             data_schema=_STEP_2_SCHEMA,
         )
+
+
+class SolarChargerOptionsFlow(config_entries.OptionsFlow):
+    """Allow reconfiguring all parameters after initial setup."""
+
+    def __init__(self) -> None:
+        self._data: dict = {}
+
+    async def async_step_init(
+        self, user_input: dict | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1: connection settings, pre-populated with current values."""
+        effective = {**self.config_entry.data, **self.config_entry.options}
+
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_charging_params()
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_CHARGER_HOST, default=effective.get(CONF_CHARGER_HOST, "")): str,
+                vol.Optional(CONF_CHARGER_PORT, default=int(effective.get(CONF_CHARGER_PORT, DEFAULT_PORT))): _int_box(1, 65535),
+                vol.Optional(CONF_CHARGER_SLAVE_ID, default=int(effective.get(CONF_CHARGER_SLAVE_ID, DEFAULT_SLAVE_ID))): _int_box(1, 255),
+                vol.Required(
+                    CONF_SOLAR_EXPORT_SENSOR,
+                    default=effective.get(CONF_SOLAR_EXPORT_SENSOR, ""),
+                ): selector.EntitySelector(selector.EntitySelectorConfig(device_class="power")),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+    async def async_step_charging_params(
+        self, user_input: dict | None = None
+    ) -> config_entries.FlowResult:
+        """Step 2: charging thresholds, pre-populated with current values."""
+        effective = {**self.config_entry.data, **self.config_entry.options}
+
+        if user_input is not None:
+            self._data.update(user_input)
+            # Preserve enabled flag managed by the switch entity
+            return self.async_create_entry(
+                title="",
+                data={
+                    "enabled": self.config_entry.options.get("enabled", True),
+                    **self._data,
+                },
+            )
+
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_MIN_CURRENT, default=int(effective.get(CONF_MIN_CURRENT, DEFAULT_MIN_CURRENT))): _int_box(6, 16),
+                vol.Optional(CONF_MAX_CURRENT, default=int(effective.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT))): _int_box(6, 16),
+                vol.Optional(CONF_VOLTAGE, default=int(effective.get(CONF_VOLTAGE, DEFAULT_VOLTAGE))): _int_box(100, 400),
+                vol.Optional(CONF_UPDATE_INTERVAL, default=int(effective.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL))): _int_box(10, 300),
+                vol.Optional(CONF_MIN_POWER_1PHASE, default=int(effective.get(CONF_MIN_POWER_1PHASE, DEFAULT_MIN_POWER_1PHASE))): _int_box(500, 5000),
+                vol.Optional(CONF_MIN_POWER_3PHASE, default=int(effective.get(CONF_MIN_POWER_3PHASE, DEFAULT_MIN_POWER_3PHASE))): _int_box(1000, 15000),
+                vol.Optional(CONF_HYSTERESIS_W, default=int(effective.get(CONF_HYSTERESIS_W, DEFAULT_HYSTERESIS_W))): _int_box(0, 1000),
+                vol.Optional(CONF_PHASE_SWITCH_PAUSE, default=int(effective.get(CONF_PHASE_SWITCH_PAUSE, DEFAULT_PHASE_SWITCH_PAUSE))): _int_box(30, 600),
+                vol.Optional(CONF_PHASE_SWITCH_REGISTER, default=int(effective.get(CONF_PHASE_SWITCH_REGISTER, DEFAULT_PHASE_SWITCH_REGISTER))): _int_box(0, 65535),
+                vol.Optional(CONF_PHASE_1_VALUE, default=int(effective.get(CONF_PHASE_1_VALUE, DEFAULT_PHASE_1_VALUE))): _int_box(0, 65535),
+                vol.Optional(CONF_PHASE_3_VALUE, default=int(effective.get(CONF_PHASE_3_VALUE, DEFAULT_PHASE_3_VALUE))): _int_box(0, 65535),
+            }
+        )
+        return self.async_show_form(step_id="charging_params", data_schema=schema)

@@ -56,7 +56,7 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
     """Coordinates Modbus I/O and exposes charging state to HA entities."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        data = entry.data
+        data = {**entry.data, **entry.options}
 
         super().__init__(
             hass,
@@ -72,21 +72,21 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
 
         self._charger = DaheimCharger(
             host=data[CONF_CHARGER_HOST],
-            port=data.get(CONF_CHARGER_PORT, DEFAULT_PORT),
-            slave_id=data.get(CONF_CHARGER_SLAVE_ID, DEFAULT_SLAVE_ID),
-            phase_switch_register=data.get(CONF_PHASE_SWITCH_REGISTER, DEFAULT_PHASE_SWITCH_REGISTER),
-            phase_1_value=data.get(CONF_PHASE_1_VALUE, DEFAULT_PHASE_1_VALUE),
-            phase_3_value=data.get(CONF_PHASE_3_VALUE, DEFAULT_PHASE_3_VALUE),
+            port=int(data.get(CONF_CHARGER_PORT, DEFAULT_PORT)),
+            slave_id=int(data.get(CONF_CHARGER_SLAVE_ID, DEFAULT_SLAVE_ID)),
+            phase_switch_register=int(data.get(CONF_PHASE_SWITCH_REGISTER, DEFAULT_PHASE_SWITCH_REGISTER)),
+            phase_1_value=int(data.get(CONF_PHASE_1_VALUE, DEFAULT_PHASE_1_VALUE)),
+            phase_3_value=int(data.get(CONF_PHASE_3_VALUE, DEFAULT_PHASE_3_VALUE)),
         )
 
         cfg = ControllerConfig(
-            min_current=data.get(CONF_MIN_CURRENT, DEFAULT_MIN_CURRENT),
-            max_current=data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT),
-            voltage=data.get(CONF_VOLTAGE, DEFAULT_VOLTAGE),
-            min_power_1phase=data.get(CONF_MIN_POWER_1PHASE, DEFAULT_MIN_POWER_1PHASE),
-            min_power_3phase=data.get(CONF_MIN_POWER_3PHASE, DEFAULT_MIN_POWER_3PHASE),
-            hysteresis_w=data.get(CONF_HYSTERESIS_W, DEFAULT_HYSTERESIS_W),
-            phase_switch_pause=data.get(CONF_PHASE_SWITCH_PAUSE, DEFAULT_PHASE_SWITCH_PAUSE),
+            min_current=int(data.get(CONF_MIN_CURRENT, DEFAULT_MIN_CURRENT)),
+            max_current=int(data.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)),
+            voltage=int(data.get(CONF_VOLTAGE, DEFAULT_VOLTAGE)),
+            min_power_1phase=int(data.get(CONF_MIN_POWER_1PHASE, DEFAULT_MIN_POWER_1PHASE)),
+            min_power_3phase=int(data.get(CONF_MIN_POWER_3PHASE, DEFAULT_MIN_POWER_3PHASE)),
+            hysteresis_w=int(data.get(CONF_HYSTERESIS_W, DEFAULT_HYSTERESIS_W)),
+            phase_switch_pause=int(data.get(CONF_PHASE_SWITCH_PAUSE, DEFAULT_PHASE_SWITCH_PAUSE)),
         )
         self._controller = Controller(self._charger, cfg)
 
