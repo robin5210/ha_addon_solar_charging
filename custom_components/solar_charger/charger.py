@@ -89,7 +89,7 @@ class DaheimCharger:
             return None
         try:
             result = await self._client.read_holding_registers(
-                address=address, count=1, slave=self.slave_id
+                address=address, count=1, device_id=self.slave_id
             )
             if result.isError():
                 log.error("Modbus read error at register %d: %s", address, result)
@@ -106,7 +106,7 @@ class DaheimCharger:
                 continue
             try:
                 result = await self._client.write_register(
-                    address=address, value=value, slave=self.slave_id
+                    address=address, value=value, device_id=self.slave_id
                 )
                 if not result.isError():
                     log.debug("Wrote %d to register %d", value, address)

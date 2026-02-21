@@ -5,7 +5,8 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:community.home-assistant.io)",
       "WebFetch(domain:docs.evcc.io)",
-      "WebFetch(domain:developers.home-assistant.io)"
+      "WebFetch(domain:developers.home-assistant.io)",
+      "WebFetch(domain:pymodbus.readthedocs.io)"
     ]
   }
 }

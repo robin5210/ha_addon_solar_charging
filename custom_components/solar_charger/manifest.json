@@ -2,7 +2,7 @@
   "domain": "solar_charger",
   "name": "Solar Surplus EV Charging",
   "version": "1.0.0",
-  "requirements": ["pymodbus==3.*"],
+  "requirements": ["pymodbus>=3.11"],
   "dependencies": [],
   "codeowners": [],
   "iot_class": "local_polling",
