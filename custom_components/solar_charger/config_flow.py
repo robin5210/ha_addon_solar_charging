@@ -168,14 +168,7 @@ class SolarChargerOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             self._data.update(user_input)
-            # Preserve enabled flag managed by the switch entity
-            return self.async_create_entry(
-                title="",
-                data={
-                    "enabled": self.config_entry.options.get("enabled", True),
-                    **self._data,
-                },
-            )
+            return self.async_create_entry(title="", data=self._data)
 
         schema = vol.Schema(
             {

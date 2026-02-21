@@ -185,6 +185,8 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             "power_w": power_w,
             "enabled": self._enabled,
             "charging_mode": self._mode,
+            "max_grid_power_w": self._max_grid_power_w,
+            "charge_now_power_w": self._charge_now_power_w,
         }
 
     # ------------------------------------------------------------------
@@ -196,22 +198,34 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
         return self._enabled
 
     async def async_set_enabled(self, value: bool) -> None:
-        """Toggle charging control and persist the state in config entry options."""
+        """Toggle charging control. State is restored via RestoreEntity on restart."""
         self._enabled = value
-        self.hass.config_entries.async_update_entry(
-            self._entry,
-            options={**self._entry.options, "enabled": value},
-        )
         await self.async_refresh()
 
     async def async_set_mode(self, mode: str) -> None:
-        """Switch charging mode and persist in config entry options."""
+        """Switch charging mode. State is restored via RestoreEntity on restart."""
         log.info("Charging mode changed: %s → %s", self._mode, mode)
         self._mode = mode
-        self.hass.config_entries.async_update_entry(
-            self._entry,
-            options={**self._entry.options, "charging_mode": mode},
-        )
+        await self.async_refresh()
+
+    @property
+    def max_grid_power_w(self) -> int:
+        return self._max_grid_power_w
+
+    async def async_set_max_grid_power(self, value: int) -> None:
+        """Update max grid power for solar-assisted mode."""
+        log.info("Max grid power changed: %d → %d W", self._max_grid_power_w, value)
+        self._max_grid_power_w = value
+        await self.async_refresh()
+
+    @property
+    def charge_now_power_w(self) -> int:
+        return self._charge_now_power_w
+
+    async def async_set_charge_now_power(self, value: int) -> None:
+        """Update target power for charge-now mode."""
+        log.info("Charge-now power changed: %d → %d W", self._charge_now_power_w, value)
+        self._charge_now_power_w = value
         await self.async_refresh()
 
     # ------------------------------------------------------------------

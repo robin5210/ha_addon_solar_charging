@@ -4,6 +4,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -24,7 +25,7 @@ async def async_setup_entry(
     async_add_entities([SolarChargerModeSelect(coordinator, entry)])
 
 
-class SolarChargerModeSelect(CoordinatorEntity, SelectEntity):
+class SolarChargerModeSelect(CoordinatorEntity, RestoreEntity, SelectEntity):
     """Select entity to switch between charging modes."""
 
     _attr_name = "Solar Charger Mode"
@@ -39,6 +40,13 @@ class SolarChargerModeSelect(CoordinatorEntity, SelectEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_mode"
+
+    async def async_added_to_hass(self) -> None:
+        """Restore charging mode across HA restarts."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in self._attr_options:
+            await self.coordinator.async_set_mode(last.state)
 
     @property
     def device_info(self):
