@@ -102,30 +102,43 @@ class Controller:
         self.current_amps: float = 0.0
         self.power_watts: float = 0.0
 
-    async def async_update(self, solar_export_w: float | None, enabled: bool) -> None:
-        """Run one control iteration (called every update_interval seconds)."""
+    async def async_update(
+        self,
+        solar_export_w: float | None,
+        enabled: bool,
+        force_charging: bool = False,
+    ) -> None:
+        """Run one control iteration (called every update_interval seconds).
+
+        When force_charging=True the controller bypasses the solar threshold check
+        so that solar-assisted and charge-now modes always maintain charging.
+        """
         log.debug(
-            "FSM tick — state: %s, solar: %s W, enabled: %s, phases: %d, amps: %.1f",
+            "FSM tick — state: %s, solar: %s W, enabled: %s, force: %s, phases: %d, amps: %.1f",
             self._state.name,
             f"{solar_export_w:.0f}" if solar_export_w is not None else "None",
             enabled,
+            force_charging,
             self._current_phases,
             self._current_amps,
         )
 
-        if solar_export_w is None:
-            log.warning("Solar sensor unavailable — stopping charger")
-            await self._safe_stop()
-            return
-
-        solar_w = max(0.0, solar_export_w)
+        if force_charging:
+            # Treat unavailable solar as 0 W — grid covers the rest
+            solar_w = max(0.0, solar_export_w or 0.0)
+        else:
+            if solar_export_w is None:
+                log.warning("Solar sensor unavailable — stopping charger")
+                await self._safe_stop()
+                return
+            solar_w = max(0.0, solar_export_w)
 
         if self._state == ChargerState.IDLE:
-            await self._handle_idle(solar_w, enabled)
+            await self._handle_idle(solar_w, enabled, force_charging)
         elif self._state == ChargerState.CHARGING_1P:
-            await self._handle_charging(solar_w, enabled, phases=1)
+            await self._handle_charging(solar_w, enabled, phases=1, force_charging=force_charging)
         elif self._state == ChargerState.CHARGING_3P:
-            await self._handle_charging(solar_w, enabled, phases=3)
+            await self._handle_charging(solar_w, enabled, phases=3, force_charging=force_charging)
         elif self._state == ChargerState.PHASE_SWITCH:
             await self._handle_phase_switch(solar_w)
         elif self._state == ChargerState.ERROR:
@@ -135,23 +148,27 @@ class Controller:
     # FSM state handlers
     # ------------------------------------------------------------------
 
-    async def _handle_idle(self, solar_w: float, enabled: bool) -> None:
+    async def _handle_idle(self, solar_w: float, enabled: bool, force_charging: bool = False) -> None:
         if not enabled:
             self._set_output("idle", 0.0, 0.0)
             return
 
-        target = _target_phase(
-            solar_w, 0, self.cfg.min_power_1phase,
-            self.cfg.min_power_3phase, self.cfg.hysteresis_w,
-        )
-        log.debug(
-            "Idle: solar %.0f W, 1p threshold %d W, 3p threshold %d W → target phase: %s",
-            solar_w, self.cfg.min_power_1phase, self.cfg.min_power_3phase,
-            target if target is not None else "none (below threshold)",
-        )
-        if target is None:
-            self._set_output("idle", 0.0, 0.0)
-            return
+        if force_charging:
+            target = 3 if solar_w >= self.cfg.min_power_3phase else 1
+            log.debug("Idle (forced): solar %.0f W → %d-phase", solar_w, target)
+        else:
+            target = _target_phase(
+                solar_w, 0, self.cfg.min_power_1phase,
+                self.cfg.min_power_3phase, self.cfg.hysteresis_w,
+            )
+            log.debug(
+                "Idle: solar %.0f W, 1p threshold %d W, 3p threshold %d W → target phase: %s",
+                solar_w, self.cfg.min_power_1phase, self.cfg.min_power_3phase,
+                target if target is not None else "none (below threshold)",
+            )
+            if target is None:
+                self._set_output("idle", 0.0, 0.0)
+                return
 
         amps = self._calc_amps(solar_w, target)
         log.info("Starting charging: %d-phase at %.1f A (solar %.0f W)", target, amps, solar_w)
@@ -165,20 +182,23 @@ class Controller:
                 amps * target * self.cfg.voltage,
             )
 
-    async def _handle_charging(self, solar_w: float, enabled: bool, phases: int) -> None:
+    async def _handle_charging(self, solar_w: float, enabled: bool, phases: int, force_charging: bool = False) -> None:
         if not enabled:
             log.info("Addon disabled — stopping charger")
             await self._safe_stop()
             return
 
-        target = _target_phase(
-            solar_w, phases, self.cfg.min_power_1phase,
-            self.cfg.min_power_3phase, self.cfg.hysteresis_w,
-        )
-        if target is None:
-            log.info("Insufficient solar (%.0f W) — stopping charger", solar_w)
-            await self._safe_stop()
-            return
+        if force_charging:
+            target = 3 if solar_w >= self.cfg.min_power_3phase else 1
+        else:
+            target = _target_phase(
+                solar_w, phases, self.cfg.min_power_1phase,
+                self.cfg.min_power_3phase, self.cfg.hysteresis_w,
+            )
+            if target is None:
+                log.info("Insufficient solar (%.0f W) — stopping charger", solar_w)
+                await self._safe_stop()
+                return
 
         if target != phases:
             log.info("Phase switch: %d → %d (solar %.0f W)", phases, target, solar_w)

@@ -17,11 +17,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .charger import DaheimCharger
 from .const import (
+    CHARGING_MODE_SOLAR_ONLY,
+    CONF_CHARGE_NOW_POWER_W,
     CONF_CHARGER_HOST,
     CONF_CHARGER_PORT,
     CONF_CHARGER_SLAVE_ID,
     CONF_HYSTERESIS_W,
     CONF_MAX_CURRENT,
+    CONF_MAX_GRID_POWER_W,
     CONF_MIN_CURRENT,
     CONF_MIN_POWER_1PHASE,
     CONF_MIN_POWER_3PHASE,
@@ -32,8 +35,10 @@ from .const import (
     CONF_SOLAR_EXPORT_SENSOR,
     CONF_UPDATE_INTERVAL,
     CONF_VOLTAGE,
+    DEFAULT_CHARGE_NOW_POWER_W,
     DEFAULT_HYSTERESIS_W,
     DEFAULT_MAX_CURRENT,
+    DEFAULT_MAX_GRID_POWER_W,
     DEFAULT_MIN_CURRENT,
     DEFAULT_MIN_POWER_1PHASE,
     DEFAULT_MIN_POWER_3PHASE,
@@ -70,6 +75,9 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
         self._entry = entry
         self._solar_sensor: str = data[CONF_SOLAR_EXPORT_SENSOR]
         self._voltage: int = int(data.get(CONF_VOLTAGE, DEFAULT_VOLTAGE))
+        self._max_grid_power_w: int = int(data.get(CONF_MAX_GRID_POWER_W, DEFAULT_MAX_GRID_POWER_W))
+        self._charge_now_power_w: int = int(data.get(CONF_CHARGE_NOW_POWER_W, DEFAULT_CHARGE_NOW_POWER_W))
+        self._mode: str = entry.options.get("charging_mode", CHARGING_MODE_SOLAR_ONLY)
 
         self._charger = DaheimCharger(
             host=data[CONF_CHARGER_HOST],
@@ -125,14 +133,25 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
         enabled = self._enabled
 
         log.debug(
-            "Update tick — solar: %s W, enabled: %s, controller state: %s",
+            "Update tick — mode: %s, solar: %s W, enabled: %s, controller state: %s",
+            self._mode,
             f"{solar_w:.0f}" if solar_w is not None else "unavailable",
             enabled,
             self._controller.status,
         )
 
+        if self._mode == "charge_now":
+            effective_solar: float | None = float(self._charge_now_power_w)
+            force_charging = True
+        elif self._mode == "solar_assisted":
+            effective_solar = (solar_w or 0.0) + self._max_grid_power_w
+            force_charging = True
+        else:  # solar_only
+            effective_solar = solar_w
+            force_charging = False
+
         try:
-            await self._controller.async_update(solar_w, enabled)
+            await self._controller.async_update(effective_solar, enabled, force_charging)
         except Exception as exc:  # noqa: BLE001
             log.exception("Unexpected error in charging controller: %s", exc)
             raise UpdateFailed(f"Controller error: {exc}") from exc
@@ -165,6 +184,7 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             "current_a": current_a,
             "power_w": power_w,
             "enabled": self._enabled,
+            "charging_mode": self._mode,
         }
 
     # ------------------------------------------------------------------
@@ -181,6 +201,16 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
         self.hass.config_entries.async_update_entry(
             self._entry,
             options={**self._entry.options, "enabled": value},
+        )
+        await self.async_refresh()
+
+    async def async_set_mode(self, mode: str) -> None:
+        """Switch charging mode and persist in config entry options."""
+        log.info("Charging mode changed: %s → %s", self._mode, mode)
+        self._mode = mode
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            options={**self._entry.options, "charging_mode": mode},
         )
         await self.async_refresh()
 

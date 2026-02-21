@@ -7,7 +7,6 @@ REG_STATUS = 0
 REG_CURRENT_L1 = 6
 REG_CURRENT_L2 = 8
 REG_CURRENT_L3 = 10
-REG_TOTAL_POWER = 13
 REG_CURRENT_LIMIT = 91   # write: amps × 10  (60 = 6 A, 160 = 16 A)
 REG_CHARGING_MODE = 93   # write: 1 = RFID/Modbus control mode
 REG_CHARGE_CMD = 95      # write: 1 = Start, 2 = Stop
@@ -32,6 +31,13 @@ CONF_PHASE_SWITCH_PAUSE = "phase_switch_pause"
 CONF_MIN_POWER_1PHASE = "min_power_1phase"
 CONF_MIN_POWER_3PHASE = "min_power_3phase"
 CONF_HYSTERESIS_W = "hysteresis_w"
+CONF_MAX_GRID_POWER_W = "max_grid_power_w"
+CONF_CHARGE_NOW_POWER_W = "charge_now_power_w"
+
+# Charging modes (stored in entry.options["charging_mode"])
+CHARGING_MODE_SOLAR_ONLY = "solar_only"
+CHARGING_MODE_SOLAR_ASSISTED = "solar_assisted"
+CHARGING_MODE_CHARGE_NOW = "charge_now"
 
 # Defaults
 DEFAULT_PORT = 502
@@ -47,3 +53,5 @@ DEFAULT_PHASE_SWITCH_PAUSE = 120
 DEFAULT_MIN_POWER_1PHASE = 1400   # 6 A × 230 V
 DEFAULT_MIN_POWER_3PHASE = 4500   # ~6.5 A × 3 × 230 V
 DEFAULT_HYSTERESIS_W = 200
+DEFAULT_MAX_GRID_POWER_W = 1400   # 6 A × 230 V — grid baseline for solar-assisted mode
+DEFAULT_CHARGE_NOW_POWER_W = 3680  # 16 A × 1-phase × 230 V

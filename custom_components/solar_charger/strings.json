@@ -25,7 +25,9 @@
           "phase_switch_pause": "Pause duration when switching phases (seconds)",
           "phase_switch_register": "Modbus register for phase switching",
           "phase_1_value": "Register value for 1-phase mode",
-          "phase_3_value": "Register value for 3-phase mode"
+          "phase_3_value": "Register value for 3-phase mode",
+          "max_grid_power_w": "Max grid power for solar-assisted mode (W)",
+          "charge_now_power_w": "Target power for charge-now mode (W)"
         }
       }
     }
@@ -56,7 +58,9 @@
           "phase_switch_pause": "Pause duration when switching phases (seconds)",
           "phase_switch_register": "Modbus register for phase switching",
           "phase_1_value": "Register value for 1-phase mode",
-          "phase_3_value": "Register value for 3-phase mode"
+          "phase_3_value": "Register value for 3-phase mode",
+          "max_grid_power_w": "Max grid power for solar-assisted mode (W)",
+          "charge_now_power_w": "Target power for charge-now mode (W)"
         }
       }
     }

@@ -8,11 +8,13 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_CHARGE_NOW_POWER_W,
     CONF_CHARGER_HOST,
     CONF_CHARGER_PORT,
     CONF_CHARGER_SLAVE_ID,
     CONF_HYSTERESIS_W,
     CONF_MAX_CURRENT,
+    CONF_MAX_GRID_POWER_W,
     CONF_MIN_CURRENT,
     CONF_MIN_POWER_1PHASE,
     CONF_MIN_POWER_3PHASE,
@@ -23,8 +25,10 @@ from .const import (
     CONF_SOLAR_EXPORT_SENSOR,
     CONF_UPDATE_INTERVAL,
     CONF_VOLTAGE,
+    DEFAULT_CHARGE_NOW_POWER_W,
     DEFAULT_HYSTERESIS_W,
     DEFAULT_MAX_CURRENT,
+    DEFAULT_MAX_GRID_POWER_W,
     DEFAULT_MIN_CURRENT,
     DEFAULT_MIN_POWER_1PHASE,
     DEFAULT_MIN_POWER_3PHASE,
@@ -74,6 +78,8 @@ _STEP_2_SCHEMA = vol.Schema(
         vol.Optional(CONF_PHASE_SWITCH_REGISTER, default=DEFAULT_PHASE_SWITCH_REGISTER): _int_box(0, 65535),
         vol.Optional(CONF_PHASE_1_VALUE, default=DEFAULT_PHASE_1_VALUE): _int_box(0, 65535),
         vol.Optional(CONF_PHASE_3_VALUE, default=DEFAULT_PHASE_3_VALUE): _int_box(0, 65535),
+        vol.Optional(CONF_MAX_GRID_POWER_W, default=DEFAULT_MAX_GRID_POWER_W): _int_box(100, 11000),
+        vol.Optional(CONF_CHARGE_NOW_POWER_W, default=DEFAULT_CHARGE_NOW_POWER_W): _int_box(100, 11000),
     }
 )
 
@@ -184,6 +190,8 @@ class SolarChargerOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_PHASE_SWITCH_REGISTER, default=int(effective.get(CONF_PHASE_SWITCH_REGISTER, DEFAULT_PHASE_SWITCH_REGISTER))): _int_box(0, 65535),
                 vol.Optional(CONF_PHASE_1_VALUE, default=int(effective.get(CONF_PHASE_1_VALUE, DEFAULT_PHASE_1_VALUE))): _int_box(0, 65535),
                 vol.Optional(CONF_PHASE_3_VALUE, default=int(effective.get(CONF_PHASE_3_VALUE, DEFAULT_PHASE_3_VALUE))): _int_box(0, 65535),
+                vol.Optional(CONF_MAX_GRID_POWER_W, default=int(effective.get(CONF_MAX_GRID_POWER_W, DEFAULT_MAX_GRID_POWER_W))): _int_box(100, 11000),
+                vol.Optional(CONF_CHARGE_NOW_POWER_W, default=int(effective.get(CONF_CHARGE_NOW_POWER_W, DEFAULT_CHARGE_NOW_POWER_W))): _int_box(100, 11000),
             }
         )
         return self.async_show_form(step_id="charging_params", data_schema=schema)

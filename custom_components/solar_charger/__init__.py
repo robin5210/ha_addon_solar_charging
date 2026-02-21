@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import SolarChargerCoordinator
 
-PLATFORMS = ["sensor", "switch"]
+PLATFORMS = ["select", "sensor", "switch"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
