@@ -107,16 +107,22 @@ class Controller:
         solar_export_w: float | None,
         enabled: bool,
         force_charging: bool = False,
+        amps_solar_w: float | None = None,
     ) -> None:
         """Run one control iteration (called every update_interval seconds).
 
-        When force_charging=True the controller bypasses the solar threshold check
-        so that solar-assisted and charge-now modes always maintain charging.
+        solar_export_w  – effective solar for start/stop threshold decisions.
+        amps_solar_w    – solar used for current calculation; if None, falls back
+                          to solar_export_w.  Set by the coordinator for
+                          solar-assisted mode so that grid power only fills the
+                          gap to minimum current and never inflates charge speed.
+        force_charging  – when True, bypass solar threshold checks (charge-now).
         """
         log.debug(
-            "FSM tick — state: %s, solar: %s W, enabled: %s, force: %s, phases: %d, amps: %.1f",
+            "FSM tick — state: %s, solar: %s W, amps_solar: %s W, enabled: %s, force: %s, phases: %d, amps: %.1f",
             self._state.name,
             f"{solar_export_w:.0f}" if solar_export_w is not None else "None",
+            f"{amps_solar_w:.0f}" if amps_solar_w is not None else "same",
             enabled,
             force_charging,
             self._current_phases,
@@ -133,14 +139,19 @@ class Controller:
                 return
             solar_w = max(0.0, solar_export_w)
 
+        # calc_w: power used for current calculation.
+        # In solar-assisted mode the coordinator passes raw solar_w here so that
+        # the grid only covers the floor (min current), not extra speed.
+        calc_w = max(0.0, amps_solar_w) if amps_solar_w is not None else solar_w
+
         if self._state == ChargerState.IDLE:
-            await self._handle_idle(solar_w, enabled, force_charging)
+            await self._handle_idle(solar_w, enabled, force_charging, calc_w)
         elif self._state == ChargerState.CHARGING_1P:
-            await self._handle_charging(solar_w, enabled, phases=1, force_charging=force_charging)
+            await self._handle_charging(solar_w, enabled, phases=1, force_charging=force_charging, calc_w=calc_w)
         elif self._state == ChargerState.CHARGING_3P:
-            await self._handle_charging(solar_w, enabled, phases=3, force_charging=force_charging)
+            await self._handle_charging(solar_w, enabled, phases=3, force_charging=force_charging, calc_w=calc_w)
         elif self._state == ChargerState.PHASE_SWITCH:
-            await self._handle_phase_switch(solar_w)
+            await self._handle_phase_switch(calc_w)
         elif self._state == ChargerState.ERROR:
             await self._handle_error()
 
@@ -148,7 +159,7 @@ class Controller:
     # FSM state handlers
     # ------------------------------------------------------------------
 
-    async def _handle_idle(self, solar_w: float, enabled: bool, force_charging: bool = False) -> None:
+    async def _handle_idle(self, solar_w: float, enabled: bool, force_charging: bool, calc_w: float) -> None:
         if not enabled:
             self._set_output("idle", 0.0, 0.0)
             return
@@ -170,8 +181,8 @@ class Controller:
                 self._set_output("idle", 0.0, 0.0)
                 return
 
-        amps = self._calc_amps(solar_w, target)
-        log.info("Starting charging: %d-phase at %.1f A (solar %.0f W)", target, amps, solar_w)
+        amps = self._calc_amps(calc_w, target)
+        log.info("Starting charging: %d-phase at %.1f A (solar %.0f W, calc %.0f W)", target, amps, solar_w, calc_w)
         if await self._start_charging(target, amps):
             self._current_phases = target
             self._current_amps = amps
@@ -182,7 +193,7 @@ class Controller:
                 amps * target * self.cfg.voltage,
             )
 
-    async def _handle_charging(self, solar_w: float, enabled: bool, phases: int, force_charging: bool = False) -> None:
+    async def _handle_charging(self, solar_w: float, enabled: bool, phases: int, force_charging: bool, calc_w: float) -> None:
         if not enabled:
             log.info("Addon disabled — stopping charger")
             await self._safe_stop()
@@ -205,9 +216,9 @@ class Controller:
             await self._begin_phase_switch(target)
             return
 
-        amps = self._calc_amps(solar_w, phases)
+        amps = self._calc_amps(calc_w, phases)
         if amps != self._current_amps:
-            log.debug("Adjusting current %.1f → %.1f A (solar %.0f W)", self._current_amps, amps, solar_w)
+            log.debug("Adjusting current %.1f → %.1f A (solar %.0f W, calc %.0f W)", self._current_amps, amps, solar_w, calc_w)
             if not await self._charger.set_current_limit(amps):
                 self._on_modbus_failure()
                 return
@@ -220,7 +231,7 @@ class Controller:
             self._current_amps * phases * self.cfg.voltage,
         )
 
-    async def _handle_phase_switch(self, solar_w: float) -> None:
+    async def _handle_phase_switch(self, calc_w: float) -> None:
         elapsed = time.monotonic() - self._phase_switch_start
         log.debug("Phase switch pause: %.0f / %d s", elapsed, self.cfg.phase_switch_pause)
         self._set_output("paused", 0.0, 0.0)
@@ -228,7 +239,7 @@ class Controller:
         if elapsed < self.cfg.phase_switch_pause:
             return
 
-        amps = self._calc_amps(solar_w, self._target_phases)
+        amps = self._calc_amps(calc_w, self._target_phases)
         log.info("Phase switch complete — %d-phase at %.1f A", self._target_phases, amps)
         if await self._start_charging(self._target_phases, amps):
             self._current_phases = self._target_phases

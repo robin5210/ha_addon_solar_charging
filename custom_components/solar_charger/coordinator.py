@@ -144,8 +144,12 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             effective_solar: float | None = float(self._charge_now_power_w)
             force_charging = True
         elif self._mode == "solar_assisted":
-            effective_solar = (solar_w or 0.0) + self._max_grid_power_w
-            force_charging = True
+            # Grid tops up solar up to max_grid_power_w. Thresholds still govern
+            # start/stop — charging halts when solar_w + max_grid_power_w falls
+            # below the minimum threshold. None is preserved so the controller
+            # stops charging if the sensor is unavailable.
+            effective_solar = solar_w + self._max_grid_power_w if solar_w is not None else None
+            force_charging = False
         else:  # solar_only
             effective_solar = solar_w
             force_charging = False
