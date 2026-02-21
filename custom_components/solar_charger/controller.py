@@ -221,7 +221,7 @@ class Controller:
     # ------------------------------------------------------------------
 
     async def _begin_phase_switch(self, target: int) -> None:
-        await self._charger.stop_charging()
+        await self._charger.pause_charging()
         self._target_phases = target
         self._phase_switch_start = time.monotonic()
         self._current_amps = 0.0

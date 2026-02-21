@@ -147,6 +147,11 @@ class DaheimCharger:
         log.info("Sending stop charge command")
         return await self._write_register(REG_CHARGE_CMD, 2)
 
+    async def pause_charging(self) -> bool:
+        """Pause charging by setting current limit to 0, keeping the session alive."""
+        log.info("Pausing charging (current limit → 0)")
+        return await self._write_register(91, 0)
+
     async def set_phase_mode(self, phases: int) -> bool:
         """Switch to 1-phase (phases=1) or 3-phase (phases=3)."""
         if phases == 1:
