@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Daheim Lader Connection",
+        "description": "Enter the IP address of your Daheim Lader and select the sensor that reports your solar export power (must be in Watts, positive = exporting to grid).",
+        "data": {
+          "charger_host": "Charger IP Address",
+          "charger_port": "Modbus Port",
+          "charger_slave_id": "Modbus Slave ID",
+          "solar_export_sensor": "Solar Export Power Sensor"
+        }
+      },
+      "charging_params": {
+        "title": "Charging Parameters",
+        "description": "Configure charging thresholds and phase switching behaviour.",
+        "data": {
+          "min_current": "Minimum charging current (A)",
+          "max_current": "Maximum charging current (A)",
+          "voltage": "Grid voltage (V)",
+          "update_interval": "Update interval (seconds)",
+          "min_power_1phase": "Minimum solar export to start 1-phase charging (W)",
+          "min_power_3phase": "Solar export threshold to switch to 3-phase (W)",
+          "hysteresis_w": "Hysteresis to prevent rapid phase switching (W)",
+          "phase_switch_pause": "Pause duration when switching phases (seconds)",
+          "phase_switch_register": "Modbus register for phase switching",
+          "phase_1_value": "Register value for 1-phase mode",
+          "phase_3_value": "Register value for 3-phase mode"
+        }
+      }
+    }
+  }
+}

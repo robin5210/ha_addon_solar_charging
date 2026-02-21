@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.daheimladen.de)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:community.home-assistant.io)",
+      "WebFetch(domain:docs.evcc.io)",
+      "WebFetch(domain:developers.home-assistant.io)"
+    ]
+  }
+}
