@@ -69,6 +69,7 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
 
         self._entry = entry
         self._solar_sensor: str = data[CONF_SOLAR_EXPORT_SENSOR]
+        self._voltage: int = int(data.get(CONF_VOLTAGE, DEFAULT_VOLTAGE))
 
         self._charger = DaheimCharger(
             host=data[CONF_CHARGER_HOST],
@@ -129,10 +130,21 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             log.exception("Unexpected error in charging controller: %s", exc)
             raise UpdateFailed(f"Controller error: {exc}") from exc
 
+        # Read actual phase currents for accurate sensor reporting.
+        # Falls back to controller-commanded values if the charger is unreachable.
+        currents = await self._charger.get_phase_currents()
+        if currents is not None:
+            i1, i2, i3 = currents
+            current_a = max(i1, i2, i3)  # per-phase current (all active phases are equal)
+            power_w = (i1 + i2 + i3) * self._voltage
+        else:
+            current_a = self._controller.current_amps
+            power_w = self._controller.power_watts
+
         return {
             "status": self._controller.status,
-            "current_a": self._controller.current_amps,
-            "power_w": self._controller.power_watts,
+            "current_a": current_a,
+            "power_w": power_w,
             "enabled": self._enabled,
         }
 

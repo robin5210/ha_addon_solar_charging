@@ -168,6 +168,15 @@ class DaheimCharger:
     async def get_status(self) -> int | None:
         return await self._read_register(0)
 
-    async def get_charging_power(self) -> float | None:
-        val = await self._read_register(13)
-        return float(val) if val is not None else None
+    async def get_phase_currents(self) -> tuple[float, float, float] | None:
+        """Read L1/L2/L3 charging currents from registers 6, 8, 10.
+
+        Register values are in tenths of Amps (÷10 = A). Returns (I_L1, I_L2, I_L3) or None
+        on Modbus failure.
+        """
+        i1 = await self._read_register(6)
+        i2 = await self._read_register(8)
+        i3 = await self._read_register(10)
+        if i1 is None or i2 is None or i3 is None:
+            return None
+        return i1 / 10, i2 / 10, i3 / 10
