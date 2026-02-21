@@ -124,6 +124,13 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
         solar_w = self._read_solar_export()
         enabled = self._enabled
 
+        log.debug(
+            "Update tick — solar: %s W, enabled: %s, controller state: %s",
+            f"{solar_w:.0f}" if solar_w is not None else "unavailable",
+            enabled,
+            self._controller.status,
+        )
+
         try:
             await self._controller.async_update(solar_w, enabled)
         except Exception as exc:  # noqa: BLE001
@@ -137,10 +144,22 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             i1, i2, i3 = currents
             current_a = max(i1, i2, i3)  # per-phase current (all active phases are equal)
             power_w = (i1 + i2 + i3) * self._voltage
+            log.debug(
+                "Phase currents — L1: %.1f A, L2: %.1f A, L3: %.1f A → %.0f W",
+                i1, i2, i3, power_w,
+            )
         else:
             current_a = self._controller.current_amps
             power_w = self._controller.power_watts
+            log.debug(
+                "Phase current read failed — using commanded values: %.1f A, %.0f W",
+                current_a, power_w,
+            )
 
+        log.debug(
+            "Tick result — status: %s, current: %.1f A, power: %.0f W",
+            self._controller.status, current_a, power_w,
+        )
         return {
             "status": self._controller.status,
             "current_a": current_a,
@@ -179,7 +198,9 @@ class SolarChargerCoordinator(DataUpdateCoordinator):
             log.warning("Solar sensor '%s' is %s", self._solar_sensor, state.state)
             return None
         try:
-            return float(state.state)
+            value = float(state.state)
+            log.debug("Solar sensor '%s' = %.1f W", self._solar_sensor, value)
+            return value
         except ValueError:
             log.error(
                 "Solar sensor '%s' has non-numeric state: %s",

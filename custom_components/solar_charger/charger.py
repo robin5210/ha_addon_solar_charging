@@ -183,5 +183,8 @@ class DaheimCharger:
         i2 = await self._read_register(8)
         i3 = await self._read_register(10)
         if i1 is None or i2 is None or i3 is None:
+            log.warning("Failed to read one or more phase current registers (6/8/10)")
             return None
-        return i1 / 10, i2 / 10, i3 / 10
+        result = i1 / 10, i2 / 10, i3 / 10
+        log.debug("Phase currents raw: L1=%d L2=%d L3=%d → %.1fA %.1fA %.1fA", i1, i2, i3, *result)
+        return result

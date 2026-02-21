@@ -104,6 +104,15 @@ class Controller:
 
     async def async_update(self, solar_export_w: float | None, enabled: bool) -> None:
         """Run one control iteration (called every update_interval seconds)."""
+        log.debug(
+            "FSM tick — state: %s, solar: %s W, enabled: %s, phases: %d, amps: %.1f",
+            self._state.name,
+            f"{solar_export_w:.0f}" if solar_export_w is not None else "None",
+            enabled,
+            self._current_phases,
+            self._current_amps,
+        )
+
         if solar_export_w is None:
             log.warning("Solar sensor unavailable — stopping charger")
             await self._safe_stop()
@@ -134,6 +143,11 @@ class Controller:
         target = _target_phase(
             solar_w, 0, self.cfg.min_power_1phase,
             self.cfg.min_power_3phase, self.cfg.hysteresis_w,
+        )
+        log.debug(
+            "Idle: solar %.0f W, 1p threshold %d W, 3p threshold %d W → target phase: %s",
+            solar_w, self.cfg.min_power_1phase, self.cfg.min_power_3phase,
+            target if target is not None else "none (below threshold)",
         )
         if target is None:
             self._set_output("idle", 0.0, 0.0)
