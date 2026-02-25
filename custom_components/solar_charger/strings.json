@@ -27,7 +27,18 @@
           "phase_1_value": "Register value for 1-phase mode",
           "phase_3_value": "Register value for 3-phase mode",
           "max_grid_power_w": "Max grid power for solar-assisted mode (W)",
-          "charge_now_power_w": "Target power for charge-now mode (W)"
+          "charge_now_power_w": "Default charge power for charge-now and cheap-grid modes (W)"
+        }
+      },
+      "overnight_charging": {
+        "title": "Overnight / Cheap-Grid Charging (Optional)",
+        "description": "Configure sensors for **cheap-grid** mode. The integration reads hourly price forecasts (Nordpool / ENTSO-E `raw_today` / `raw_tomorrow` attributes) and selects the cheapest hours needed to reach the target SoC. The **Peak Power Limit** entity (set after setup) throttles or pauses charging when total grid import would exceed your capacity tariff limit. The monthly peak sensor ensures already-recorded peaks are used as the effective floor (Belgian capaciteitstarief). Leave sensor fields empty to skip that feature.",
+        "data": {
+          "car_soc_sensor": "Car battery SoC sensor (%)",
+          "price_sensor": "Electricity price sensor (with hourly forecast attributes)",
+          "grid_import_sensor": "Total grid import power sensor (W) — for peak shaving",
+          "monthly_peak_sensor": "Monthly recorded peak power sensor (W) — capaciteitstarief",
+          "car_battery_kwh": "Car battery capacity (kWh)"
         }
       }
     }
@@ -60,7 +71,18 @@
           "phase_1_value": "Register value for 1-phase mode",
           "phase_3_value": "Register value for 3-phase mode",
           "max_grid_power_w": "Max grid power for solar-assisted mode (W)",
-          "charge_now_power_w": "Target power for charge-now mode (W)"
+          "charge_now_power_w": "Default charge power for charge-now and cheap-grid modes (W)"
+        }
+      },
+      "overnight_charging": {
+        "title": "Overnight / Cheap-Grid Charging (Optional)",
+        "description": "Update sensors for cheap-grid charging and peak shaving. Leave sensor fields empty to disable that feature.",
+        "data": {
+          "car_soc_sensor": "Car battery SoC sensor (%)",
+          "price_sensor": "Electricity price sensor (with hourly forecast attributes)",
+          "grid_import_sensor": "Total grid import power sensor (W) — for peak shaving",
+          "monthly_peak_sensor": "Monthly recorded peak power sensor (W) — capaciteitstarief",
+          "car_battery_kwh": "Car battery capacity (kWh)"
         }
       }
     }

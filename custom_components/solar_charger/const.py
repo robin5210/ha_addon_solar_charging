@@ -33,11 +33,17 @@ CONF_MIN_POWER_3PHASE = "min_power_3phase"
 CONF_HYSTERESIS_W = "hysteresis_w"
 CONF_MAX_GRID_POWER_W = "max_grid_power_w"
 CONF_CHARGE_NOW_POWER_W = "charge_now_power_w"
+CONF_CAR_SOC_SENSOR = "car_soc_sensor"
+CONF_PRICE_SENSOR = "price_sensor"
+CONF_GRID_IMPORT_SENSOR = "grid_import_sensor"
+CONF_MONTHLY_PEAK_SENSOR = "monthly_peak_sensor"
+CONF_CAR_BATTERY_KWH = "car_battery_kwh"
 
 # Charging modes (stored in entry.options["charging_mode"])
 CHARGING_MODE_SOLAR_ONLY = "solar_only"
 CHARGING_MODE_SOLAR_ASSISTED = "solar_assisted"
 CHARGING_MODE_CHARGE_NOW = "charge_now"
+CHARGING_MODE_CHEAP_GRID = "cheap_grid"
 
 # Defaults
 DEFAULT_PORT = 502
@@ -55,3 +61,8 @@ DEFAULT_MIN_POWER_3PHASE = 4500   # ~6.5 A × 3 × 230 V
 DEFAULT_HYSTERESIS_W = 200
 DEFAULT_MAX_GRID_POWER_W = 1400   # 6 A × 230 V — grid baseline for solar-assisted mode
 DEFAULT_CHARGE_NOW_POWER_W = 3680  # 16 A × 1-phase × 230 V
+DEFAULT_TARGET_SOC_PCT = 80        # stop cheap-grid charging at 80 % SoC
+DEFAULT_MAX_GRID_PRICE = 0.10      # safety cap: don't charge above this price even in scheduled hours
+DEFAULT_CAR_BATTERY_KWH = 60       # used to compute charge hours from remaining SoC
+DEFAULT_MIN_CHARGE_HOURS = 4       # fallback hours per day when SoC / battery data unavailable
+DEFAULT_PEAK_POWER_LIMIT_W = 0     # 0 = disabled; set to your capacity tariff limit in W

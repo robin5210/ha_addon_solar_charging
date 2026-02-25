@@ -8,6 +8,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_CAR_BATTERY_KWH,
+    CONF_CAR_SOC_SENSOR,
     CONF_CHARGE_NOW_POWER_W,
     CONF_CHARGER_HOST,
     CONF_CHARGER_PORT,
@@ -22,9 +24,13 @@ from .const import (
     CONF_PHASE_3_VALUE,
     CONF_PHASE_SWITCH_PAUSE,
     CONF_PHASE_SWITCH_REGISTER,
+    CONF_GRID_IMPORT_SENSOR,
+    CONF_MONTHLY_PEAK_SENSOR,
+    CONF_PRICE_SENSOR,
     CONF_SOLAR_EXPORT_SENSOR,
     CONF_UPDATE_INTERVAL,
     CONF_VOLTAGE,
+    DEFAULT_CAR_BATTERY_KWH,
     DEFAULT_CHARGE_NOW_POWER_W,
     DEFAULT_HYSTERESIS_W,
     DEFAULT_MAX_CURRENT,
@@ -43,6 +49,7 @@ from .const import (
     DOMAIN,
 )
 
+
 def _int_box(min_val: int, max_val: int) -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
@@ -54,14 +61,20 @@ def _int_box(min_val: int, max_val: int) -> selector.NumberSelector:
     )
 
 
+def _entity_selector(device_class: str | None = None) -> selector.EntitySelector:
+    cfg = selector.EntitySelectorConfig(
+        domain="sensor",
+        device_class=device_class,
+    )
+    return selector.EntitySelector(cfg)
+
+
 _STEP_1_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_CHARGER_HOST): str,
         vol.Optional(CONF_CHARGER_PORT, default=DEFAULT_PORT): _int_box(1, 65535),
         vol.Optional(CONF_CHARGER_SLAVE_ID, default=DEFAULT_SLAVE_ID): _int_box(1, 255),
-        vol.Required(CONF_SOLAR_EXPORT_SENSOR): selector.EntitySelector(
-            selector.EntitySelectorConfig(device_class="power")
-        ),
+        vol.Required(CONF_SOLAR_EXPORT_SENSOR): _entity_selector(device_class="power"),
     }
 )
 
@@ -83,9 +96,20 @@ _STEP_2_SCHEMA = vol.Schema(
     }
 )
 
+# Step 3 schema is built dynamically (optional entity selectors, pre-populated in options flow)
+_STEP_3_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_CAR_SOC_SENSOR): _entity_selector(device_class="battery"),
+        vol.Optional(CONF_PRICE_SENSOR): _entity_selector(),
+        vol.Optional(CONF_GRID_IMPORT_SENSOR): _entity_selector(device_class="power"),
+        vol.Optional(CONF_MONTHLY_PEAK_SENSOR): _entity_selector(device_class="power"),
+        vol.Optional(CONF_CAR_BATTERY_KWH, default=DEFAULT_CAR_BATTERY_KWH): _int_box(10, 200),
+    }
+)
+
 
 class SolarChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Two-step config flow: connection settings, then charging parameters."""
+    """Three-step config flow: connection → charging parameters → overnight charging."""
 
     VERSION = 1
 
@@ -101,17 +125,11 @@ class SolarChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict | None = None
     ) -> config_entries.FlowResult:
         """Step 1: charger host and solar sensor."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_charging_params()
 
-        return self.async_show_form(
-            step_id="user",
-            data_schema=_STEP_1_SCHEMA,
-            errors=errors,
-        )
+        return self.async_show_form(step_id="user", data_schema=_STEP_1_SCHEMA)
 
     async def async_step_charging_params(
         self, user_input: dict | None = None
@@ -119,16 +137,20 @@ class SolarChargerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step 2: charging thresholds and phase switch parameters."""
         if user_input is not None:
             self._data.update(user_input)
-            host = self._data[CONF_CHARGER_HOST]
-            return self.async_create_entry(
-                title=f"Solar Charger ({host})",
-                data=self._data,
-            )
+            return await self.async_step_overnight_charging()
 
-        return self.async_show_form(
-            step_id="charging_params",
-            data_schema=_STEP_2_SCHEMA,
-        )
+        return self.async_show_form(step_id="charging_params", data_schema=_STEP_2_SCHEMA)
+
+    async def async_step_overnight_charging(
+        self, user_input: dict | None = None
+    ) -> config_entries.FlowResult:
+        """Step 3 (optional): car SoC and electricity price sensors for cheap-grid mode."""
+        if user_input is not None:
+            self._data.update(user_input)
+            host = self._data[CONF_CHARGER_HOST]
+            return self.async_create_entry(title=f"Solar Charger ({host})", data=self._data)
+
+        return self.async_show_form(step_id="overnight_charging", data_schema=_STEP_3_SCHEMA)
 
 
 class SolarChargerOptionsFlow(config_entries.OptionsFlow):
@@ -155,7 +177,7 @@ class SolarChargerOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_SOLAR_EXPORT_SENSOR,
                     default=effective.get(CONF_SOLAR_EXPORT_SENSOR, ""),
-                ): selector.EntitySelector(selector.EntitySelectorConfig(device_class="power")),
+                ): _entity_selector(device_class="power"),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -168,7 +190,7 @@ class SolarChargerOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             self._data.update(user_input)
-            return self.async_create_entry(title="", data=self._data)
+            return await self.async_step_overnight_charging()
 
         schema = vol.Schema(
             {
@@ -188,3 +210,38 @@ class SolarChargerOptionsFlow(config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(step_id="charging_params", data_schema=schema)
+
+    async def async_step_overnight_charging(
+        self, user_input: dict | None = None
+    ) -> config_entries.FlowResult:
+        """Step 3: optional car SoC and price sensors, pre-populated."""
+        effective = {**self.config_entry.data, **self.config_entry.options}
+
+        if user_input is not None:
+            self._data.update(user_input)
+            return self.async_create_entry(title="", data=self._data)
+
+        # Build schema with current values as defaults; optional sensors may be absent
+        schema_dict: dict = {}
+
+        def _optional_entity(key: str, device_class: str | None = None) -> None:
+            current = effective.get(key)
+            sel = _entity_selector(device_class=device_class)
+            if current:
+                schema_dict[vol.Optional(key, default=current)] = sel
+            else:
+                schema_dict[vol.Optional(key)] = sel
+
+        _optional_entity(CONF_CAR_SOC_SENSOR, "battery")
+        _optional_entity(CONF_PRICE_SENSOR)
+        _optional_entity(CONF_GRID_IMPORT_SENSOR, "power")
+        _optional_entity(CONF_MONTHLY_PEAK_SENSOR, "power")
+        schema_dict[vol.Optional(
+            CONF_CAR_BATTERY_KWH,
+            default=int(effective.get(CONF_CAR_BATTERY_KWH, DEFAULT_CAR_BATTERY_KWH)),
+        )] = _int_box(10, 200)
+
+        return self.async_show_form(
+            step_id="overnight_charging",
+            data_schema=vol.Schema(schema_dict),
+        )

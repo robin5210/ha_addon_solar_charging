@@ -9,6 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CHARGING_MODE_CHARGE_NOW,
+    CHARGING_MODE_CHEAP_GRID,
     CHARGING_MODE_SOLAR_ASSISTED,
     CHARGING_MODE_SOLAR_ONLY,
     DOMAIN,
@@ -34,6 +35,7 @@ class SolarChargerModeSelect(CoordinatorEntity, RestoreEntity, SelectEntity):
         CHARGING_MODE_SOLAR_ONLY,
         CHARGING_MODE_SOLAR_ASSISTED,
         CHARGING_MODE_CHARGE_NOW,
+        CHARGING_MODE_CHEAP_GRID,
     ]
 
     def __init__(self, coordinator: SolarChargerCoordinator, entry: ConfigEntry) -> None:
